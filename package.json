@@ -38,6 +38,8 @@
     "@types/probe-image-size": "^7.0.1",
     "@types/ws": "^8.2.0",
     "protobufjs": "^6.11.2",
+    "tsc": "^2.0.4",
+    "typescript": "^4.8.2",
     "ws": "^8.2.3"
   },
   "files": [

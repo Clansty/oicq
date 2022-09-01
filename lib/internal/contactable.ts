@@ -212,6 +212,7 @@ export abstract class Contactable {
 				})
 			})
 		})
+		// @ts-ignore
 		const [width, height, seconds] = await new Promise((resolve) => {
 			exec(`${this.c.config.ffprobe_path || "ffprobe"} -i "${file}" -show_streams`, (error, stdout, stderr) => {
 				const lines = (stdout || stderr || "").split("\n")
