@@ -111,7 +111,7 @@ export class Converter {
 			return
 		}
 		if (qq === "all") {
-			var q = 0, flag = 1, display = "全体成员"
+			var q = 0, flag = 1, display = text || "全体成员"
 		} else {
 			var q = Number(qq), flag = 0, display = text || String(qq)
 			if (!text) {
@@ -119,7 +119,6 @@ export class Converter {
 				display = member?.card || member?.nickname || display
 			}
 		}
-		display = "@" + display
 		if (dummy)
 			return this._text(display)
 		const buf = Buffer.allocUnsafe(6)
