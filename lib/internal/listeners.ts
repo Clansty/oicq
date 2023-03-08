@@ -68,8 +68,6 @@ async function onlineListener(this: Client, token: Buffer, nickname: string, gen
 	// 恢复之前的状态
 	this.status = this.status || OnlineStatus.Online
 	this.setOnlineStatus(this.status).catch(NOOP)
-	// 存token
-	tokenUpdatedListener.call(this, token)
 	this.logger.mark(`Welcome, ${this.nickname} ! 正在加载资源...`)
 	await Promise.allSettled([
 		this.reloadFriendList(),
@@ -83,10 +81,6 @@ async function onlineListener(this: Client, token: Buffer, nickname: string, gen
 	this.logger.mark(`加载了${this.fl.size}个好友，${this.gl.size}个群，${this.sl.size}个陌生人`)
 	pbGetMsg.call(this).catch(NOOP)
 	this.em("system.online")
-}
-
-function tokenUpdatedListener(this: Client, token: Buffer) {
-	fs.writeFile(path.join(this.dir, "token"), token, NOOP)
 }
 
 function kickoffListener(this: Client, message: string) {
@@ -188,7 +182,6 @@ function qrcodeErrorListener(this: Client, code: number, message: string) {
 export function bindInternalListeners(this: Client) {
 	this.on("internal.online", onlineListener)
 	this.on("internal.kickoff", kickoffListener)
-	this.on("internal.token", tokenUpdatedListener)
 	this.on("internal.qrcode", qrcodeListener)
 	this.on("internal.slider", sliderListener)
 	this.on("internal.verify", verifyListener)

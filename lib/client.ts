@@ -45,10 +45,6 @@ export class Client extends BaseClient {
 	/** 创建一个讨论组对象 */
 	readonly pickDiscuss = Discuss.as.bind(this)
 
-	/** 日志记录器，初始情况下是`log4js.Logger` */
-	logger: Logger | log4js.Logger
-	/** 账号本地数据存储目录 */
-	readonly dir: string
 	/** 配置 */
 	readonly config: Required<Config>
 
@@ -216,8 +212,8 @@ export class Client extends BaseClient {
 			this.password_md5 = md5pass
 		}
 		try {
-			const token = await fs.promises.readFile(path.join(this.dir, "token"))
-			return this.tokenLogin(token)
+			const token = await fs.promises.readFile(path.join(this.dir, "token.json"), 'utf-8')
+			return this.tokenLogin(JSON.parse(token))
 		} catch {
 			if (this.password_md5)
 				return this.passwordLogin(this.password_md5)

@@ -164,7 +164,7 @@ export function highwayHttpUpload(this: Client, readable: stream.Readable, obj: 
 	const port = this.sig.bigdata.port
 	if (!port) throw new ApiRejection(ErrorCode.NoUploadChannel, "没有上传通道，如果你刚刚登录，请等待几秒")
 
-	this.logger.debug(`highway(http) ip:${ip} port:${port}`)
+	this.logger.mark(`highway(http) ip:${ip} port:${port}`)
 	const url = "http://" + ip + ":" + port + "/cgi-bin/httpconn?htcmd=0x6FF0087&uin=" + this.uin
 	let seq = 1
 	let offset = 0, limit = 524288
@@ -216,7 +216,8 @@ export function highwayHttpUpload(this: Client, readable: stream.Readable, obj: 
 					httpAgent: agent,
 					cancelToken: c.token,
 					headers: {
-						"Content-Length": String(buf.length)
+						"Content-Length": String(buf.length),
+                        "Content-Type": "application/octet-stream"
 					}
 				}).then(r => {
 					let percentage, rsp
@@ -235,12 +236,12 @@ export function highwayHttpUpload(this: Client, readable: stream.Readable, obj: 
 					}
 					++finished
 					percentage = (finished / tasks.size * 100).toFixed(2)
-					this.logger.debug(`highway(http) chunk uploaded (${percentage}%)`)
+					this.logger.mark(`highway(http) chunk uploaded (${percentage}%)`)
 					if (typeof obj.callback === "function" && percentage)
 						obj.callback(percentage)
 					if (finished < tasks.size && rsp[7]?.toBuffer().length > 0) {
 						cancels.forEach(c => c.cancel())
-						this.logger.debug(`highway(http) chunk uploaded (100.00%)`)
+						this.logger.mark(`highway(http) chunk uploaded (100.00%)`)
 						if (typeof obj.callback === "function")
 							obj.callback("100.00")
 					}

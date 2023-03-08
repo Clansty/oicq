@@ -37,7 +37,7 @@ const map: {[tag: number]: (this: BaseClient, ...args: any[]) => Writer} = {
 	0x16: function () {
 		const apk = getApkInfo(Platform.Watch)
 		return new Writer()
-			.writeU32(7)
+			.writeU32(apk.ssover)
 			.writeU32(apk.appid)
 			.writeU32(apk.subid)
 			.writeBytes(this.device.guid)
@@ -93,7 +93,7 @@ const map: {[tag: number]: (this: BaseClient, ...args: any[]) => Writer} = {
 	0x100: function (emp = 0) {
 		return new Writer()
 			.writeU16(1) // db buf ver
-			.writeU32(7) // sso ver, dont over 7
+			.writeU32(this.apk.ssover) // sso ver, dont over 7
 			.writeU32(this.apk.appid)
 			.writeU32(emp ? 2 : this.apk.subid)
 			.writeU32(0) // app client ver
@@ -106,7 +106,7 @@ const map: {[tag: number]: (this: BaseClient, ...args: any[]) => Writer} = {
 		const body = new Writer()
 			.writeU16(4) // tgtgt ver
 			.writeBytes(crypto.randomBytes(4))
-			.writeU32(7) // sso ver
+			.writeU32(this.apk.ssover) // sso ver
 			.writeU32(this.apk.appid)
 			.writeU32(0) // app client ver
 			.writeU64(this.uin)
@@ -137,12 +137,18 @@ const map: {[tag: number]: (this: BaseClient, ...args: any[]) => Writer} = {
 			.writeU16(0)    // pic size
 			.writeU8(1)     // ret type
 	},
+	0x108: function () {
+        return new Writer().writeBytes(this.ksid);
+    },
 	0x109: function () {
 		return new Writer().writeBytes(md5(this.device.imei))
 	},
 	0x10a: function () {
 		return new Writer().writeBytes(this.sig.tgt)
 	},
+	0x112: function () {
+        return new Writer().writeTlv(String(this.uin));
+    },
 	0x116: function () {
 		return new Writer()
 			.writeU8(0)
@@ -267,32 +273,12 @@ const map: {[tag: number]: (this: BaseClient, ...args: any[]) => Writer} = {
 		return new Writer().writeBytes(crypto.randomBytes(16))
 	},
 	0x511: function () {
-		const domains = new Set<Domain>([
-			"aq.qq.com",
-			"buluo.qq.com",
-			"connect.qq.com",
-			"docs.qq.com",
-			"game.qq.com",
-			"gamecenter.qq.com",
-			// "graph.qq.com",
-			"haoma.qq.com",
-			"id.qq.com",
-			// "imgcache.qq.com",
-			"kg.qq.com",
-			"mail.qq.com",
-			"mma.qq.com",
-			"office.qq.com",
-			// "om.qq.com",
-			"openmobile.qq.com",
-			"qqweb.qq.com",
-			"qun.qq.com",
-			"qzone.qq.com",
-			"ti.qq.com",
-			"v.qq.com",
-			"vip.qq.com",
-			"y.qq.com",
-		])
-		const stream = new Writer().writeU16(domains.size)
+		const domains = [
+            "tenpay.com", "openmobile.qq.com", "docs.qq.com", "connect.qq.com",
+            "qzone.qq.com", "vip.qq.com", "qun.qq.com", "game.qq.com", "qqweb.qq.com",
+            "office.qq.com", "ti.qq.com", "mail.qq.com", "gamecenter.qq.com", "mma.qq.com",
+        ];
+		const stream = new Writer().writeU16(domains.length)
 		for (let v of domains)
 			stream.writeU8(0x01).writeTlv(v)
 		return stream
@@ -326,6 +312,32 @@ const map: {[tag: number]: (this: BaseClient, ...args: any[]) => Writer} = {
 		})
 		return new Writer().writeBytes(buf)
 	},
+	0x542: function () {
+        return new Writer().writeBytes(Buffer.from([0x4A, 0x02, 0x60, 0x01]));
+    },
+    0x544: function () {
+		return new Writer()
+		.writeBytes(
+			Buffer.concat(
+				[Buffer.from([0x0C, 0x03]),
+				crypto.randomBytes(6),
+				Buffer.alloc(2),
+				crypto.randomBytes(10),
+				Buffer.alloc(4),
+				crypto.randomBytes(4),
+				Buffer.alloc(4),
+			])); // random generate, may not work?
+    },
+    0x545: function (qimei) {
+        return new Writer().writeBytes(Buffer.from(qimei)); // TODO: get qimei, https://snowflake.qq.com/ola/android
+    },
+	0x547: function () {
+        return new Writer().writeBytes(this.sig.t547);
+    },
+	0x548: function () {
+        // TODO: PoW test data
+        return new Writer().writeU8(0x01);
+    }
 }
 
 export function getPacker(c: BaseClient) {

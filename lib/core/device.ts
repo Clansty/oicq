@@ -120,6 +120,7 @@ const mobile = {
 	sigmap: 16724722,
 	sdkver: "6.0.0.2530",
 	display: "Android",
+	ssover: 19,
 }
 const watch: Apk = {
 	id: "com.tencent.qqlite",
@@ -134,6 +135,7 @@ const watch: Apk = {
 	sigmap: 34869472,
 	sdkver: "6.0.0.236",
 	display: "Watch",
+	ssover: 7,
 }
 const hd: Apk = {
 	id: "com.tencent.minihd.qq",
@@ -148,6 +150,7 @@ const hd: Apk = {
 	sigmap: 1970400,
 	sdkver: "6.0.0.2487",
 	display: "aPad",
+	ssover: 12,
 }
 
 const mac: Apk = {
@@ -163,6 +166,7 @@ const mac: Apk = {
 	sigmap: 1970400,
 	sdkver: "6.0.0.2487",
 	display: "iMac",
+	ssover: 12,
 }
 
 const apklist: {[platform in Platform]: Apk} = {

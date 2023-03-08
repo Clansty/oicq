@@ -1,5 +1,5 @@
 import { EventEmitter } from "events"
-import { randomBytes } from "crypto"
+import { createHash, randomBytes } from "crypto"
 import { Readable } from "stream"
 import Network from "./network"
 import Ecdh from "./ecdh"
@@ -10,6 +10,10 @@ import * as pb from "./protobuf"
 import * as jce from "./jce"
 import { BUF0, BUF4, BUF16, NOOP, md5, timestamp, lock, hide, unzip, int32ip2str } from "./constants"
 import { ShortDevice, Device, generateFullDevice, Platform, Apk, getApkInfo } from "./device"
+import { Logger } from "../client"
+import log4js from "log4js"
+import fs from "fs"
+import path from "path"
 
 const FN_NEXT_SEQ = Symbol("FN_NEXT_SEQ")
 const FN_SEND = Symbol("FN_SEND")
@@ -58,7 +62,7 @@ export interface BaseClient {
 	/** 登录成功 */
 	on(name: "internal.online", listener: (this: this, token: Buffer, nickname: string, gender: number, age: number) => void): this
 	/** token更新 */
-	on(name: "internal.token", listener: (this: this, token: Buffer) => void): this
+	on(name: "internal.token", listener: (this: this, token: JsonToken) => void): this
 	/** 服务器强制下线 */
 	on(name: "internal.kickoff", listener: (this: this, reason: string) => void): this
 	/** 业务包 */
@@ -66,6 +70,17 @@ export interface BaseClient {
 	/** 日志信息 */
 	on(name: "internal.verbose", listener: (this: this, verbose: unknown, level: VerboseLevel) => void): this
 	on(name: string | symbol, listener: (this: this, ...args: any[]) => void): this
+}
+
+export type JsonToken = {
+	d2key: string
+	d2: string
+	ticket_key: string
+	sig_key: string
+	srm_token: string
+	tgt: string
+	device_token: string
+	skey: string
 }
 
 export class BaseClient extends EventEmitter {
@@ -76,6 +91,9 @@ export class BaseClient extends EventEmitter {
 	private readonly [NET] = new Network
 	// 回包的回调函数
 	private readonly [HANDLERS] = new Map<number, (buf: Buffer) => void>()
+    logger: Logger | log4js.Logger = log4js.getLogger(`[BaseClient]`);
+	/** 账号本地数据存储目录 */
+	dir = ''
 
 	readonly apk: Apk
 	readonly device: Device
@@ -90,7 +108,16 @@ export class BaseClient extends EventEmitter {
 		d2key: BUF0,
 		t104: BUF0,
 		t174: BUF0,
+		t547: BUF0,
 		qrsig: BUF0,
+		srm_token: BUF0,
+		st_key: BUF0,
+		tgt_key: BUF0,
+		st_web_sig: BUF0,
+		t103: BUF0,
+		sig_key: BUF0,
+		ticket_key: BUF0,
+		device_token: BUF0,
 		/** 大数据上传通道 */
 		bigdata: {
 			ip: "",
@@ -119,7 +146,7 @@ export class BaseClient extends EventEmitter {
 	/** 随心跳一起触发的函数，可以随意设定 */
 	protected heartbeat = NOOP
 	// 心跳定时器
-	private [HEARTBEAT]: NodeJS.Timeout
+	private [HEARTBEAT]?: NodeJS.Timeout
 	/** 数据统计 */
 	protected readonly statistics = {
 		start_time: timestamp(),
@@ -133,6 +160,10 @@ export class BaseClient extends EventEmitter {
 		remote_ip: "",
 		remote_port: 0,
 	}
+
+	get ksid() {
+        return Buffer.from(`|${this.device.imei}|` + this.apk.name);
+    }
 
 	constructor(public readonly uin: number, p: Platform = Platform.Android, d?: ShortDevice) {
 		super()
@@ -196,24 +227,29 @@ export class BaseClient extends EventEmitter {
 	}
 
 	/** 使用接收到的token登录 */
-	tokenLogin(token: Buffer) {
-		if (![144, 152].includes(token.length))
-			throw new Error("bad token")
+	tokenLogin(token: JsonToken) {
 		this.sig.session = randomBytes(4)
 		this.sig.randkey = randomBytes(16)
 		this[ECDH] = new Ecdh
-		this.sig.d2key = token.slice(0, 16)
-		this.sig.d2 = token.slice(16, token.length - 72)
-		this.sig.tgt = token.slice(token.length - 72)
+		this.sig.d2key = Buffer.from(token.d2key, 'base64')
+		this.sig.d2 = Buffer.from(token.d2, 'base64')
+		this.sig.tgt = Buffer.from(token.tgt, 'base64')
+		this.sig.ticket_key = Buffer.from(token.ticket_key, 'base64')
+		this.sig.sig_key = Buffer.from(token.sig_key, 'base64')
+		this.sig.skey = Buffer.from(token.skey, 'base64')
+		this.sig.srm_token = Buffer.from(token.srm_token, 'base64')
+		this.sig.device_token = Buffer.from(token.device_token, 'base64')
 		this.sig.tgtgt = md5(this.sig.d2key)
 		const t = tlv.getPacker(this)
 		const body = new Writer()
 			.writeU16(11)
-			.writeU16(16)
+			.writeU16(18)
 			.writeBytes(t(0x100))
 			.writeBytes(t(0x10a))
 			.writeBytes(t(0x116))
+			.writeBytes(t(0x108))
 			.writeBytes(t(0x144))
+			//.writeBytes(t(0x112))
 			.writeBytes(t(0x143))
 			.writeBytes(t(0x142))
 			.writeBytes(t(0x154))
@@ -224,9 +260,10 @@ export class BaseClient extends EventEmitter {
 			.writeBytes(t(0x177))
 			.writeBytes(t(0x187))
 			.writeBytes(t(0x188))
-			.writeBytes(t(0x202))
+			.writeBytes(t(0x194))
 			.writeBytes(t(0x511))
-			.read()
+			.writeBytes(t(0x202))
+			.read();
 		this[FN_SEND_LOGIN]("wtlogin.exchange_emp", body)
 	}
 	/**
@@ -241,7 +278,7 @@ export class BaseClient extends EventEmitter {
 		const t = tlv.getPacker(this)
 		let body = new Writer()
 			.writeU16(9)
-			.writeU16(23)
+			.writeU16(25)
 			.writeBytes(t(0x18))
 			.writeBytes(t(0x1))
 			.writeBytes(t(0x106, md5pass))
@@ -265,6 +302,8 @@ export class BaseClient extends EventEmitter {
 			.writeBytes(t(0x516))
 			.writeBytes(t(0x521))
 			.writeBytes(t(0x525))
+			.writeBytes(t(0x544))
+			.writeBytes(t(0x542))
 			.read()
 		this[FN_SEND_LOGIN]("wtlogin.login", body)
 	}
@@ -521,6 +560,73 @@ export class BaseClient extends EventEmitter {
 			throw new ApiRejection(-1, `client not online`)
 		return this[FN_SEND](buildUniPkt.call(this, cmd, body), timeout)
 	}
+	calcPoW(data: Uint8Array) {
+        // TODO
+        if (!data || data.length === 0) return Buffer.alloc(0);
+        const stream = Readable.from(data, { objectMode: false });
+        const version = stream.read(1).readUInt8();
+        const typ = stream.read(1).readUInt8();
+        const hashType = stream.read(1).readUInt8();
+        let ok = stream.read(1).readUInt8() === 0;
+        const maxIndex = stream.read(2).readUInt16BE();
+        const reserveBytes = stream.read(2);
+        const src = stream.read(stream.read(2).readUInt16BE());
+        const tgt = stream.read(stream.read(2).readUInt16BE());
+        const cpy = stream.read(stream.read(2).readUInt16BE());
+
+        if (hashType !== 1) {
+            this.logger.warn(`Unsupported tlv546 hash type ${hashType}`);
+            return Buffer.alloc(0);
+        }
+		let inputNum = BigInt("0x" + src.toString("hex"));
+        switch (typ) {
+            case 1:
+                // TODO
+				// See https://github.com/mamoe/mirai/blob/cc7f35519ea7cc03518a57dc2ee90d024f63be0e/mirai-core/src/commonMain/kotlin/network/protocol/packet/login/wtlogin/WtLoginExt.kt#L207
+                this.logger.warn(`Unsupported tlv546 algorithm type ${typ}`);
+                break;
+            case 2:
+                // Calc SHA256
+                let dst = Buffer.from([]);
+                let elp = 0, cnt = 0;
+                if (tgt.length === 32) {
+                    const start = Date.now();
+                    let hash = createHash("sha256").update(Buffer.from(inputNum.toString(16), "hex")).digest();
+                    while (Buffer.compare(hash, tgt) !== 0) {
+						inputNum ++;
+                        hash = createHash("sha256").update(Buffer.from(inputNum.toString(16), "hex")).digest();                        
+						cnt++;
+                        if (cnt > 1000000) {
+                            this.logger.error("Calc PoW cost too many times, maybe something wrong");
+                            throw new Error("Calc PoW cost too many times, maybe something wrong");
+                        }
+                    }
+                    ok = true;
+                    dst = Buffer.from(inputNum.toString(16), "hex");
+                    elp = Date.now() - start;
+					this.logger.info(`Calculating PoW of plus ${cnt} times cost ${elp} ms`);
+                }
+                if (!ok) return Buffer.alloc(0);
+                const body = new Writer()
+                    .writeU8(version)
+                    .writeU8(typ)
+                    .writeU8(hashType)
+                    .writeU8(ok ? 1 : 0)
+                    .writeU16(maxIndex)
+                    .writeBytes(reserveBytes)
+                    .writeTlv(src)
+                    .writeTlv(tgt)
+                    .writeTlv(cpy)
+                    .writeTlv(dst)
+                    .writeU32(elp)
+                    .writeU32(cnt);
+                return body.read();
+            default:
+                this.logger.warn(`Unsupported tlv546 algorithm type ${typ}`);
+                break;
+        }
+		return Buffer.alloc(0);
+    }
 }
 
 function buildUniPkt(this: BaseClient, cmd: string, body: Uint8Array, seq = 0) {
@@ -887,6 +993,14 @@ function decodeT119(this: BaseClient, t119: Buffer) {
 	this.sig.d2 = t[0x143]
 	this.sig.d2key = t[0x305]
 	this.sig.tgtgt = md5(this.sig.d2key)
+	this.sig.srm_token = t[0x16a] || this.sig.srm_token
+	this.sig.st_key = t[0x10e] || this.sig.st_key
+	this.sig.tgt_key = t[0x10d] || this.sig.tgt_key
+	this.sig.st_web_sig = t[0x103] || this.sig.st_web_sig
+	this.sig.t103 = this.sig.st_web_sig
+	this.sig.sig_key = t[0x133] || this.sig.sig_key
+	this.sig.ticket_key = t[0x134] || this.sig.ticket_key
+	this.sig.device_token = t[0x322] || this.sig.device_token
 	this.sig.emp_time = timestamp()
 	if (t[0x512]) {
 		const r = Readable.from(t[0x512], { objectMode: false })
@@ -898,11 +1012,12 @@ function decodeT119(this: BaseClient, t119: Buffer) {
 			this.pskey[domain] = pskey
 		}
 	}
-	const token = Buffer.concat([
-		this.sig.d2key,
-		this.sig.d2,
-		this.sig.tgt,
-	])
+	const token = {}
+	for (const key of ['tgt', 'skey', 'd2', 'd2key', 'srm_token', 'st_key', 'tgt_key', 'st_web_sig', 't103', 'sig_key', 'ticket_key', 'device_token']) {
+		// @ts-ignore
+		token[key] = this.sig[key].toString('base64')
+	}
+	fs.writeFileSync(path.join(this.dir, "token.json"), JSON.stringify(token))
 	const age = t[0x11a].slice(2, 3).readUInt8()
 	const gender = t[0x11a].slice(3, 4).readUInt8()
 	const nickname = String(t[0x11a].slice(5))
@@ -916,6 +1031,8 @@ function decodeLoginResponse(this: BaseClient, payload: Buffer): any {
 	const type = r.read(1).readUInt8() as number
 	r.read(2)
 	const t = readTlv(r)
+
+	if (t[0x546]) this.sig.t547 = this.calcPoW(t[0x546]);
 
 	if (type === 204) {
 		this.sig.t104 = t[0x104]
@@ -953,7 +1070,7 @@ function decodeLoginResponse(this: BaseClient, payload: Buffer): any {
 		return this.emit("internal.error.login", type, "[登陆失败]未知格式的验证码")
 	}
 
-	if (type === 160) {
+	if (type === 160 || type === 162 || type === 239) {
 		if (!t[0x204] && !t[0x174])
 			return this.emit("internal.verbose", "已向密保手机发送短信验证码", VerboseLevel.Mark)
 		let phone = ""
@@ -962,7 +1079,10 @@ function decodeLoginResponse(this: BaseClient, payload: Buffer): any {
 			this.sig.t174 = t[0x174]
 			phone = String(t[0x178]).substr(t[0x178].indexOf("\x0b") + 1, 11)
 		}
-		return this.emit("internal.verify", t[0x204]?.toString() || "", phone)
+		let url = ""
+		if (t[0x204])
+			url = String(t[0x204]).replace("verify", "qrcode");
+		return this.emit("internal.verify", url, phone)
 	}
 
 	if (t[0x149]) {
