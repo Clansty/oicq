@@ -6,3 +6,4 @@ lib/**/*.js
 !lib/**/protobuf.min.d.ts
 !lib/**/protobuf.min.js
 package-lock.json
+*.tgz

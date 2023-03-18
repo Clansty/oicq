@@ -86,7 +86,7 @@ async function onlineListener(this: Client, token: Buffer, nickname: string, gen
 function kickoffListener(this: Client, message: string) {
 	this.logger.warn(message)
 	this.terminate()
-	fs.unlink(path.join(this.dir, "token"), () => {
+	fs.unlink(path.join(this.dir, "token.json"), () => {
 		this.em("system.offline.kickoff", { message })
 	})
 }
@@ -144,7 +144,7 @@ function loginErrorListener(this: Client, code: number, message: string) {
 	// toke expired
 	if (!code) {
 		this.logger.mark("登录token过期")
-		fs.unlink(path.join(this.dir, "token"), (err) => {
+		fs.unlink(path.join(this.dir, "token.json"), (err) => {
 			if (err) {
 				this.logger.fatal(err.message)
 				return
@@ -158,7 +158,7 @@ function loginErrorListener(this: Client, code: number, message: string) {
 		this.terminate()
 		this.logger.error(message)
 		if (code === -3) //register failed
-			fs.unlink(path.join(this.dir, "token"), NOOP)
+			fs.unlink(path.join(this.dir, "token.json"), NOOP)
 		const t = this.config.reconn_interval
 		if (t >= 1) {
 			this.logger.mark(t + "秒后重新连接")
