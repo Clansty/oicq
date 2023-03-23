@@ -312,14 +312,18 @@ export class BaseClient extends EventEmitter {
 	submitSlider(ticket: string) {
 		ticket = String(ticket).trim()
 		const t = tlv.getPacker(this)
-		const body = new Writer()
+		const writer = new Writer()
 			.writeU16(2)
 			.writeU16(4)
 			.writeBytes(t(0x193, ticket))
 			.writeBytes(t(0x8))
 			.writeBytes(t(0x104))
 			.writeBytes(t(0x116))
-			.read()
+		if (this.sig.t547.length) writer.writeBytes(t(0x547));
+		if (this.apk.ssover > 12) {
+			writer.writeBytes(t(0x544, 2)) // TODO: native t544
+		}
+		const body = writer.read()
 		this[FN_SEND_LOGIN]("wtlogin.login", body)
 	}
 
