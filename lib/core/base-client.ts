@@ -315,7 +315,6 @@ export class BaseClient extends EventEmitter {
 		const writer = new Writer()
 			.writeU16(2)
 			.writeU16(4)
-			.writeBytes(t(0x193, ticket))
 			.writeBytes(t(0x8))
 			.writeBytes(t(0x104))
 			.writeBytes(t(0x116))
