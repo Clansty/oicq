@@ -312,9 +312,12 @@ export class BaseClient extends EventEmitter {
 	submitSlider(ticket: string) {
 		ticket = String(ticket).trim()
 		const t = tlv.getPacker(this)
+		let tlv_count = this.sig.t547.length ? 6 : 5;
+		if (this.apk.ssover <= 12) tlv_count--;
 		const writer = new Writer()
 			.writeU16(2)
-			.writeU16(4)
+			.writeU16(tlv_count)
+			.writeBytes(t(0x193, ticket))
 			.writeBytes(t(0x8))
 			.writeBytes(t(0x104))
 			.writeBytes(t(0x116))
@@ -348,9 +351,11 @@ export class BaseClient extends EventEmitter {
 		if (Buffer.byteLength(code) !== 6)
 			code = "123456"
 		const t = tlv.getPacker(this)
-		const body = new Writer()
+		let tlv_count = 8;
+    	if (this.apk.ssover <= 12) tlv_count--;
+		const writer = new Writer()
 			.writeU16(7)
-			.writeU16(7)
+			.writeU16(tlv_count)
 			.writeBytes(t(0x8))
 			.writeBytes(t(0x104))
 			.writeBytes(t(0x116))
@@ -358,7 +363,10 @@ export class BaseClient extends EventEmitter {
 			.writeBytes(t(0x17c, code))
 			.writeBytes(t(0x401))
 			.writeBytes(t(0x198))
-			.read()
+		if (this.apk.ssover > 12) {
+			writer.writeBytes(t(0x544, 7)) // TODO: native t544
+		}
+		const body = writer.read()
 		this[FN_SEND_LOGIN]("wtlogin.login", body)
 	}
 
