@@ -419,7 +419,12 @@ export abstract class Contactable {
 	 *    对着群制作的转发消息中的图片，发给好友可能会裂图，反过来也一样。
 	 * 3. 暂不完全支持套娃转发。
 	 */
-	async makeForwardMsg(msglist: Forwardable[] | Forwardable): Promise<XmlElem> {
+	async makeForwardMsg(msglist: Forwardable[] | Forwardable): Promise<{
+		element: XmlElem;
+		tSum: number;
+		resid: string;
+		fileSize: number;
+	}> {
 		if (!Array.isArray(msglist))
 			msglist = [msglist]
 		const nodes = []
@@ -480,9 +485,14 @@ export abstract class Contactable {
 		const xml = `<?xml version="1.0" encoding="utf-8"?>
 <msg brief="[聊天记录]" m_fileName="${uuid().toUpperCase()}" action="viewMultiMsg" tSum="${nodes.length}" flag="3" m_resid="${resid}" serviceID="35" m_fileSize="${compressed.length}"><item layout="1"><title color="#000000" size="34">转发的聊天记录</title>${preview}<hr></hr><summary color="#808080" size="26">查看${nodes.length}条转发消息</summary></item><source name="聊天记录"></source></msg>`
 		return {
-			type: "xml",
-			data: xml,
-			id: 35,
+			tSum: nodes.length,
+			resid,
+			fileSize: compressed.length,
+			element: {
+				type: "xml",
+				data: xml,
+				id: 35,
+			}
 		}
 	}
 
