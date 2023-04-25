@@ -104,6 +104,7 @@ export enum Platform {
 	iMac = 4,
 	iPad = 5,
 	Android_FIX = 6,
+	iPad8950 = 7,
 }
 
 export type Apk = typeof mobile
@@ -111,15 +112,15 @@ export type Apk = typeof mobile
 const mobile = {
 	id: "com.tencent.mobileqq",
 	name: "A8.9.33.2045045f",
-	version: "8.9.30.10200",
-	ver: "8.9.30",
+	version: "8.9.33.10335",
+	ver: "8.9.33",
 	sign: Buffer.from([166, 183, 69, 191, 36, 162, 194, 119, 82, 119, 22, 246, 243, 110, 182, 141]),
-	buildtime: 1671103213,
+	buildtime: 1673599898,
 	appid: 16,
-	subid: 537150482,
+	subid: 537151682,
 	bitmap: 150470524,
 	sigmap: 16724722,
-	sdkver: "6.0.0.2530",
+	sdkver: "6.0.0.2534",
 	display: "Android",
 	ssover: 19,
 }
@@ -191,6 +192,21 @@ const apklist: {[platform in Platform]: Apk} = {
         sdkver: "6.0.0.2497",
         ssover: 18,
 	},
+	[Platform.iPad8950]: {
+		display: 'iPad8950',
+        id: "com.tencent.mobileqq",
+        name: "A8.9.50.611",
+        version: "8.9.50.611",
+        ver: "8.9.50",
+        sign: Buffer.from([170, 57, 120, 244, 31, 217, 111, 249, 145, 74, 102, 158, 24, 100, 116, 199]),
+        buildtime: 1676531414,
+        appid: 16,
+        subid: 537155074,
+        bitmap: 150470524,
+        sigmap: 16724722,
+        sdkver: "6.0.0.2535",
+        ssover: 19,
+    },
 }
 
 apklist[Platform.iPad].subid = 537151363
