@@ -118,6 +118,7 @@ export class BaseClient extends EventEmitter {
 		sig_key: BUF0,
 		ticket_key: BUF0,
 		device_token: BUF0,
+		t544: {},
 		/** 大数据上传通道 */
 		bigdata: {
 			ip: "",
@@ -276,9 +277,9 @@ export class BaseClient extends EventEmitter {
 		this.sig.tgtgt = randomBytes(16)
 		this[ECDH] = new Ecdh
 		const t = tlv.getPacker(this)
-		let body = new Writer()
+		let writter = new Writer()
 			.writeU16(9)
-			.writeU16(25)
+			.writeU16(26)
 			.writeBytes(t(0x18))
 			.writeBytes(t(0x1))
 			.writeBytes(t(0x106, md5pass))
@@ -303,8 +304,9 @@ export class BaseClient extends EventEmitter {
 			.writeBytes(t(0x521))
 			.writeBytes(t(0x525))
 			.writeBytes(t(0x544))
+			.writeBytes(t(0x548, "810_9"))
 			.writeBytes(t(0x542))
-			.read()
+		let body = writter.read()
 		this[FN_SEND_LOGIN]("wtlogin.login", body)
 	}
 
@@ -323,7 +325,7 @@ export class BaseClient extends EventEmitter {
 			.writeBytes(t(0x116))
 		if (this.sig.t547.length) writer.writeBytes(t(0x547));
 		if (this.apk.ssover > 12) {
-			writer.writeBytes(t(0x544, 2)) // TODO: native t544
+			writer.writeBytes(t(0x544, "810_2")) // TODO: native t544
 		}
 		const body = writer.read()
 		this[FN_SEND_LOGIN]("wtlogin.login", body)
@@ -364,7 +366,7 @@ export class BaseClient extends EventEmitter {
 			.writeBytes(t(0x401))
 			.writeBytes(t(0x198))
 		if (this.apk.ssover > 12) {
-			writer.writeBytes(t(0x544, 7)) // TODO: native t544
+			writer.writeBytes(t(0x544, "810_7")) // TODO: native t544
 		}
 		const body = writer.read()
 		this[FN_SEND_LOGIN]("wtlogin.login", body)

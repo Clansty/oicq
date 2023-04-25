@@ -103,13 +103,14 @@ export enum Platform {
 	Watch = 3,
 	iMac = 4,
 	iPad = 5,
+	Android_FIX = 6,
 }
 
 export type Apk = typeof mobile
 
 const mobile = {
 	id: "com.tencent.mobileqq",
-	name: "A8.9.30.10200",
+	name: "A8.9.33.2045045f",
 	version: "8.9.30.10200",
 	ver: "8.9.30",
 	sign: Buffer.from([166, 183, 69, 191, 36, 162, 194, 119, 82, 119, 22, 246, 243, 110, 182, 141]),
@@ -124,16 +125,16 @@ const mobile = {
 }
 const watch: Apk = {
 	id: "com.tencent.qqlite",
-	name: "A2.0.5",
-	version: "2.0.5",
-	ver: "2.0.5",
+	name: "A2.0.8",
+	version: "2.0.8",
+	ver: "2.0.8",
 	sign: Buffer.from([166, 183, 69, 191, 36, 162, 194, 119, 82, 119, 22, 246, 243, 110, 182, 141]),
 	buildtime: 1559564731,
 	appid: 16,
-	subid: 537064446,
+	subid: 537065138,
 	bitmap: 16252796,
 	sigmap: 34869472,
-	sdkver: "6.0.0.236",
+	sdkver: "6.0.0.2365",
 	display: "Watch",
 	ssover: 7,
 }
@@ -145,7 +146,7 @@ const hd: Apk = {
 	sign: Buffer.from([170, 57, 120, 244, 31, 217, 111, 249, 145, 74, 102, 158, 24, 100, 116, 199]),
 	buildtime: 1637427966,
 	appid: 16,
-	subid: 537067382,
+	subid: 537151218,
 	bitmap: 150470524,
 	sigmap: 1970400,
 	sdkver: "6.0.0.2487",
@@ -175,9 +176,26 @@ const apklist: {[platform in Platform]: Apk} = {
 	[Platform.Watch]: watch,
 	[Platform.iMac]: mac,
 	[Platform.iPad]: { ...mobile },
+	[Platform.Android_FIX]: {
+		display: 'Android_FIX',
+		id: "com.tencent.mobileqq",
+        name: "A8.8.88.7083",
+        version: "8.8.88.7083",
+        ver: "8.8.88",
+        sign: Buffer.from([166, 183, 69, 191, 36, 162, 194, 119, 82, 119, 22, 246, 243, 110, 182, 141]),
+        buildtime: 1648004515,
+        appid: 16,
+        subid: 537118044,
+        bitmap: 150470524,
+        sigmap: 16724722,
+        sdkver: "6.0.0.2497",
+        ssover: 18,
+	},
 }
 
-apklist[Platform.iPad].subid = 537149258
+apklist[Platform.iPad].subid = 537151363
+apklist[Platform.iPad].name = "A8.9.33.614"
+apklist[Platform.iPad].version = "8.9.33.614"
 apklist[Platform.iPad].display = "iPad"
 apklist[Platform.iPad].sign = mac.sign
 
