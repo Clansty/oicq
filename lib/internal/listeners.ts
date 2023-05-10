@@ -145,10 +145,6 @@ function loginErrorListener(this: Client, code: number, message: string) {
 	if (!code) {
 		this.logger.mark("登录token过期")
 		fs.unlink(path.join(this.dir, "token.json"), (err) => {
-			if (err) {
-				this.logger.fatal(err.message)
-				return
-			}
 			this.logger.mark("3秒后重新连接")
 			setTimeout(this.login.bind(this), 3000)
 		})

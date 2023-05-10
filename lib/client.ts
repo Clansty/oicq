@@ -213,10 +213,11 @@ export class Client extends BaseClient {
 		}
 		try {
 			const token = await fs.promises.readFile(path.join(this.dir, "token.json"), 'utf-8')
+			this.logger.info('正在尝试 Token 登录')
 			return this.tokenLogin(JSON.parse(token))
 		} catch {
 			if (this.password_md5)
-				return this.passwordLogin(this.password_md5)
+				return await this.passwordLogin(this.password_md5)
 			else
 				return this.sig.qrsig.length ? this.qrcodeLogin() : this.fetchQrcode()
 		}

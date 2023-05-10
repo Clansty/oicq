@@ -271,21 +271,36 @@ export class BaseClient extends EventEmitter {
 	 * 使用密码登录
 	 * @param md5pass 密码的md5值
 	 */
-	passwordLogin(md5pass: Buffer) {
+	async passwordLogin(md5pass: Buffer) {
+		// if (this.apk.ssover > 12 && (!this.device.qimei16 || !this.device.qimei36)) {
+		// 	const qimei = await getQIMEI(this.c);
+		// 	// 缓存一下，理论上每次获取是一样的
+		// 	this.device.qimei16 = qimei.q16;
+		// 	this.device.qimei36 = qimei.q36;
+		// 	this.logger.info("获取到QIMEI: " + this.device.qimei16 + " " + this.device.qimei36);
+		// }
+		// if (this.apk.ssover > 12 && (!this.device.qimei16 || !this.device.qimei36))
+		// 	this.logger.warn("无法获取QIMEI，可能会导致登录失败");
+		// this.session_id = randomBytes(4);
+		// this.random_key = randomBytes(16);
+		// this.ecdh = new Ecdh;
 		this.sig.session = randomBytes(4)
 		this.sig.randkey = randomBytes(16)
 		this.sig.tgtgt = randomBytes(16)
 		this[ECDH] = new Ecdh
 		const t = tlv.getPacker(this)
-		let writter = new Writer()
+		let tlv_count = 26;
+    if (this.apk.ssover <= 12) tlv_count--;
+		let writer = new Writer()
 			.writeU16(9)
-			.writeU16(26)
+			.writeU16(tlv_count)
 			.writeBytes(t(0x18))
 			.writeBytes(t(0x1))
 			.writeBytes(t(0x106, md5pass))
 			.writeBytes(t(0x116))
 			.writeBytes(t(0x100))
 			.writeBytes(t(0x107))
+			//.writeBytes(t(0x108))
 			.writeBytes(t(0x142))
 			.writeBytes(t(0x144))
 			.writeBytes(t(0x145))
@@ -296,17 +311,30 @@ export class BaseClient extends EventEmitter {
 			.writeBytes(t(0x511))
 			.writeBytes(t(0x187))
 			.writeBytes(t(0x188))
-			.writeBytes(t(0x194))
-			.writeBytes(t(0x191))
-			.writeBytes(t(0x202))
+		//if (!this.device.qimei16){
+			writer.writeBytes(t(0x194)) // should have been removed
+		//}
+		writer.writeBytes(t(0x191))
+		//if (!this.device.qimei16){
+			writer.writeBytes(t(0x202)) // should have been removed
+		//}
+		writer
 			.writeBytes(t(0x177))
 			.writeBytes(t(0x516))
 			.writeBytes(t(0x521))
 			.writeBytes(t(0x525))
-			.writeBytes(t(0x544))
-			.writeBytes(t(0x548, "810_9"))
+		if (this.apk.ssover > 12) {
+			writer.writeBytes(t(0x544, "810_9"))
+		}
+		//if (this.device.qimei16) {
+			//writer.writeBytes(t(0x545, this.device.qimei16))
+		//}
+		writer
+		.writeBytes(t(0x548))
+		.writeBytes(t(0x542))		
 			.writeBytes(t(0x542))
-		let body = writter.read()
+		.writeBytes(t(0x542))		
+		let body = writer.read()
 		this[FN_SEND_LOGIN]("wtlogin.login", body)
 	}
 
@@ -315,18 +343,18 @@ export class BaseClient extends EventEmitter {
 		ticket = String(ticket).trim()
 		const t = tlv.getPacker(this)
 		let tlv_count = this.sig.t547.length ? 6 : 5;
-		if (this.apk.ssover <= 12) tlv_count--;
-		const writer = new Writer()
-			.writeU16(2)
-			.writeU16(tlv_count)
-			.writeBytes(t(0x193, ticket))
-			.writeBytes(t(0x8))
-			.writeBytes(t(0x104))
-			.writeBytes(t(0x116))
-		if (this.sig.t547.length) writer.writeBytes(t(0x547));
-		if (this.apk.ssover > 12) {
-			writer.writeBytes(t(0x544, "810_2")) // TODO: native t544
-		}
+    if (this.apk.ssover <= 12) tlv_count--;
+    const writer = new Writer()
+        .writeU16(2)
+        .writeU16(tlv_count)
+        .writeBytes(t(0x193, ticket))
+        .writeBytes(t(0x8))
+        .writeBytes(t(0x104))
+        .writeBytes(t(0x116));
+    if (this.sig.t547.length) writer.writeBytes(t(0x547));
+    if (this.apk.ssover > 12) {
+        writer.writeBytes(t(0x544, "810_2"))
+    }
 		const body = writer.read()
 		this[FN_SEND_LOGIN]("wtlogin.login", body)
 	}
@@ -573,6 +601,144 @@ export class BaseClient extends EventEmitter {
 			throw new ApiRejection(-1, `client not online`)
 		return this[FN_SEND](buildUniPkt.call(this, cmd, body), timeout)
 	}
+	// genRandomPayloadByDevice(info: Device, apk: Apk) {
+  //   const rangeRand = (max = 1, min = 0) => {
+  //       if (max < min) [max, min] = [min, max]
+  //       const diff = max - min
+  //       return Math.floor(Math.random() * diff) + min
+  //   };
+  //   const reserved = {
+  //       "harmony": "0",
+  //       "clone": "0",
+  //       "containe": "",
+  //       "oz": "",
+  //       "oo": "",
+  //       "kelong": "0",
+  //       "uptimes": dateFormat(),
+  //       "multiUser": "0",
+  //       "bod": info.board,
+  //       "brd": info.brand,
+  //       "dv": info.device,
+  //       "firstLevel": "",
+  //       "manufact": info.brand,
+  //       "name": info.model,
+  //       "host": "se.infra",
+  //       "kernel": info.fingerprint
+  //   };
+  //   let beaconId = "";
+  //   const timestamp = Date.now();
+  //   const mtime1 = new Date(info.mtime);
+  //   const mtimeStr1 = dateFormat("YYYY-mm-ddHHMMSS", mtime1) + "." + info.imei.slice(2, 11);
+  //   const mtime2 = new Date(info.mtime - parseInt(info.imei.slice(2, 4)));
+  //   const mtimeStr2 = dateFormat("YYYY-mm-ddHHMMSS", mtime2) + "." + info.imei.slice(5, 14);
+  //   for (let i = 1; i <= 40; i++) {
+  //       if ([1, 13, 14, 17, 18, 21, 33, 34, 37, 38].includes(i)) {
+  //           beaconId += `k${i}:${dateFormat("YYYY-mm-ddHHMMSS", new Date(timestamp + rangeRand(60, 0)))}.${String(rangeRand(99, 0)).padStart(2, '0')}0000000`;
+  //       } else if ([25, 26, 29, 30].includes(i)) {
+  //           const fixed = ((i === 25 ? 10 : 11) + parseInt(info.imei.slice(5, 7))) % 100;
+  //           const fixed_str = String(fixed).padStart(2, "0");
+  //           beaconId += `k${i}:${dateFormat("YYYY-mm-ddHHMMSS")}.${fixed_str}0000000`;
+  //       } else if (i === 2) {
+  //           beaconId += `k2:${mtimeStr1}`;
+  //       } else if (i === 3) {
+  //           beaconId += "k3:0000000000000000";
+  //       } else if (i === 4) {
+  //           beaconId += `k4:${md5(info.android_id + info.imei).toString("hex").slice(0, 16)}`;
+  //       } else if (i === 5) {
+  //           beaconId += `k5:${rangeRand(10000000, 1000000)}`;
+  //       } else if ([6, 7, 8].includes(i)) {
+  //           beaconId += `k${i}:${rangeRand(1000000, 100000)}`;
+  //       } else if (i === 9) {
+  //           beaconId += `k9:${info.boot_id}`;
+  //       } else if (i === 10) {
+  //           break;
+  //       } else if (i === 19) {
+  //           beaconId += `k19:${rangeRand(50000, 10000)}`;
+  //       } else if (i === 22) {
+  //           beaconId += `k22:${mtimeStr2}`;
+  //       } else if ([16, 20, 28, 36].includes(i)) {
+  //           beaconId += `k${i}:${rangeRand(100, 10)}`;
+  //       } else if ([23, 27, 31].includes(i)) {
+  //           beaconId += `k${i}:${rangeRand(10000, 1000)}`;
+  //       } else {
+  //           beaconId += `k${i}:${rangeRand(5, 0)}`;
+  //       }
+  //       beaconId += ";";
+  //   }
+  //   beaconId += "k10:1";
+  //   return {
+  //       "androidId": "",
+  //       "platformId": 1,
+  //       "appKey": "0S200MNJT807V3GE",
+  //       "appVersion": apk.version,
+  //       "beaconIdSrc": beaconId,
+  //       "brand": info.brand,
+  //       "channelId": "2017",
+  //       "cid": "",
+  //       "imei": info.imei,
+  //       "imsi": "",
+  //       "mac": info.mac_address,
+  //       "model": info.model,
+  //       "networkType": "unknown",
+  //       "oaid": "",
+  //       "osVersion": `Android ${info.version.release},level ${info.version.sdk}`,
+  //       "qimei": "",
+  //       "qimei36": "",
+  //       "sdkVersion": "1.2.13.6",
+  //       "targetSdkVersion": "26",
+  //       "audit": "",
+  //       "userId": "{}",
+  //       "packageId": apk.id,
+  //       "deviceType": apk.display==='aPad' ? "Pad" : "Phone",
+  //       "sdkName": "",
+  //       "reserved": JSON.stringify(reserved),
+  //   };
+	// }
+	// getQIMEI() {
+  //   const k = randomBytes(8).toString("hex");
+  //   const key = rsa.encryptPKCS1(k, rsaPublicKey);
+  //   const time = new Date().getTime();
+  //   const nonce = randomBytes(8).toString("hex");
+  //   const payload = genRandomPayloadByDevice(this.device, this.apk, this.config.platform);
+  //   const str = JSON.stringify(payload);
+  //   const params = aes.encrypt(str, k).toString("base64");
+
+  //   const postData = {
+  //       "key": key,
+  //       "params": params,
+  //       "time": time,
+  //       "nonce": nonce,
+  //       "sign": md5(key + params + time + nonce + secret).toString("hex"),
+  //       "extra": "",
+  //   }
+  //   const { data } = await axios.post("https://snowflake.qq.com/ola/android", postData, {
+  //       headers: {
+  //           "User-Agent": `Dalvik/2.1.0 (Linux; U; Android ${client.device.version.release}; ${client.device.product} Build/${client.device.android_id.slice(0, 6)})`,
+  //           "Content-Type": "application/json"
+  //       }
+  //   });
+  //   if (data.code !== 0) {
+  //       client.logger.error("获取 QIMEI 失败 Code: " + data.code);
+  //       return {
+  //           q16: "",
+  //           q36: "",
+  //       };
+  //   }
+  //   try {
+  //       const { q16, q36 } = JSON.parse(aes.decrypt(data.data, k).toString())
+  //       return {
+  //           q16,
+  //           q36,
+  //       };
+  //   } catch (e) {
+  //       client.logger.error("获取 QIMEI 出错");
+  //       client.logger.error(e);
+  //       return {
+  //           q16: "",
+  //           q36: "",
+  //       };
+  //   }
+	// }
 	calcPoW(data: Uint8Array) {
         // TODO
         if (!data || data.length === 0) return Buffer.alloc(0);

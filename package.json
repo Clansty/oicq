@@ -1,7 +1,7 @@
 {
   "name": "oicq",
-  "version": "2.3.12-clansty",
-  "upday": "2023/4/25",
+  "version": "2.3.14-clansty",
+  "upday": "2023/5/10",
   "description": "QQ protocol!",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

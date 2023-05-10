@@ -4,6 +4,7 @@ import * as pb from "./protobuf"
 import Writer from "./writer"
 import { md5, BUF0 } from "./constants"
 import { getApkInfo, Platform } from "./device"
+const { sign } = require("./t544");
 
 type BaseClient = import("./base-client").BaseClient
 
@@ -24,7 +25,7 @@ const map: {[tag: number]: (this: BaseClient, ...args: any[]) => Writer} = {
 			.writeU16(1) // ip ver
 			.writeBytes(crypto.randomBytes(4))
 			.writeU32(this.uin)
-			.write32(Date.now() & 0xffffffff)
+			.write32((Date.now() / 1000) & 0xffffffff)
 			.writeBytes(Buffer.alloc(4)) //ip
 			.writeU16(0)
 	},
@@ -110,7 +111,7 @@ const map: {[tag: number]: (this: BaseClient, ...args: any[]) => Writer} = {
 			.writeU32(this.apk.appid)
 			.writeU32(0) // app client ver
 			.writeU64(this.uin)
-			.write32(Date.now() & 0xffffffff)
+			.write32((Date.now() / 1000) & 0xffffffff)
 			.writeBytes(Buffer.alloc(4)) // dummy ip
 			.writeU8(1) // save password
 			.writeBytes(md5pass)
@@ -266,7 +267,7 @@ const map: {[tag: number]: (this: BaseClient, ...args: any[]) => Writer} = {
 			.writeBytes(crypto.randomBytes(16))
 			.write32(1)
 			.write32(16)
-			.write32(Date.now() & 0xffffffff)
+			.write32((Date.now() / 1000) & 0xffffffff)
 			.writeBytes(Buffer.alloc(0))
 	},
 	0x401: function () {
@@ -315,22 +316,30 @@ const map: {[tag: number]: (this: BaseClient, ...args: any[]) => Writer} = {
 	0x542: function () {
         return new Writer().writeBytes(Buffer.from([0x4A, 0x02, 0x60, 0x01]));
     },
-    0x544: function (code = "810_9") {
-        return new Writer()
-			.writeBytes(
-				Buffer.concat([
-					Buffer.from([0x0C, 0x03]),
-					crypto.randomBytes(6),
-					Buffer.alloc(2),
-					crypto.randomBytes(10),
-					Buffer.alloc(4),
-					crypto.randomBytes(4),
-					Buffer.alloc(4),
-				])); // random generate, may not work?
-    },
-    0x545: function (qimei) {
-        return new Writer().writeBytes(Buffer.from(qimei)); // TODO: get qimei, https://snowflake.qq.com/ola/android
-    },
+	0x544: function (code = "810_9") {
+		const salt = new Writer()
+		const subCmd = parseInt(code.split("_")[1] || 9)
+		if (["810_9", "810_a", "810_d", "810_f"].includes(code)) {
+				salt.writeU32(0)
+				salt.writeTlv(this.device.guid)
+				salt.writeTlv(Buffer.from(this.apk.sdkver))
+				salt.writeU32(subCmd)
+				salt.writeU32(0)
+		} else {
+				salt.writeU64(this.uin)
+				salt.writeTlv(this.device.guid)
+				salt.writeTlv(Buffer.from(this.apk.sdkver))
+				salt.writeU32(subCmd)
+		}
+		const _salt = salt.read()
+		const t544 = sign((new Date()).getTime(), _salt);
+		this.logger.debug("tlv544 salt: " + _salt.toString("hex"));
+		this.logger.debug("tlv544 result: " + t544.toString("hex"));
+		return new Writer().writeBytes(t544);
+	},
+	0x545: function (qimei) {
+			return new Writer().writeBytes(Buffer.from(qimei)); // TODO: get qimei, https://snowflake.qq.com/ola/android
+	},
 	0x547: function () {
         return new Writer().writeBytes(this.sig.t547);
     },
